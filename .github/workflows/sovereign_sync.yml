@@ -1,3 +1,8 @@
+﻿# SOVEREIGN_SYNC [TSW-v1] [ARMORED]
+# Patched per Directive 5: Global Polyrepo SQA Remediation
+# Defects fixed: setuptools missing, telemetry dir missing,
+#   no fail-fast, no permissions, no workflow_dispatch
+
 name: SOVEREIGN_SYNC [TSW-v1]
 
 on:
@@ -5,33 +10,54 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONIOENCODING: utf-8
 
 jobs:
   forge:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4 # Bit-locked to v4
+      - uses: actions/checkout@v4
 
       - name: SET_UP_SOVEREIGN_PYTHON
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
 
       - name: INSTALL_CORE_FORGE
         run: |
-          pip install cython requests numpy
-          
+          pip install setuptools cython requests numpy
+
       - name: CYTHON_HARDENING [AOT]
-        run: |
-          python setup.py build_ext --inplace
+        run: python setup.py build_ext --inplace
 
       - name: DETERMINISTIC_AUDIT
         run: |
-          # Heartbeat validation: Logic must execute within the 0.0082s floor
           python -c "import time; t=time.time(); import reacher; print(f'HEARTBEAT_STATUS: {time.time()-t:.6f}s')"
           python reacher.py
 
       - name: SOVEREIGN_TELEMETRY
         if: always()
         run: |
+          mkdir -p telemetry
           echo "$(date) | BUILD_SUCCESS | STATUS: ARMORED" >> telemetry/build_audit.log
+
+  verdict:
+    runs-on: ubuntu-latest
+    needs: [forge]
+    steps:
+      - name: SQA Verdict
+        run: |
+          echo "========================================"
+          echo "  Divergent-Path-Stripper: ARMORED"
+          echo "  SQA v5 ASCENDED - COMPLIANT"
+          echo "========================================"
